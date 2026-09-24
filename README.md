@@ -1,36 +1,32 @@
-# Nginx Load Balancer + SSL Termination
+# Nginx load balancer and local TLS
 
-A Docker Compose lab demonstrating Nginx as a reverse proxy: SSL termination, HTTP-to-HTTPS redirect, and round-robin load balancing across multiple backend instances.
+Local Docker Compose lab: one TLS-terminating proxy distributes requests across three static Nginx backends using round-robin balancing. Requires Docker Compose and OpenSSL on the host.
 
-## Architecture
+## Start from a fresh clone
 
-- 3 backend instances (Nginx serving static content) representing application servers
-- 1 Nginx load balancer terminating SSL and distributing traffic across the backend pool
-- Self-signed certificate for local demonstration (production would use Let's Encrypt via certbot)
-
-## What it shows
-
-- Nginx `upstream` block for load balancing
-- SSL/TLS termination at the proxy layer
-- Automatic HTTP → HTTPS redirect
-- A `/health` endpoint for monitoring integration
-
-## Stack
-
-Docker Compose, Nginx, OpenSSL
-
-## Usage
-
-\`\`\`bash
+```bash
+bash scripts/generate-cert.sh
 docker compose up -d
-\`\`\`
+```
 
-Test load balancing:
-\`\`\`bash
-for i in {1..6}; do curl -sk https://localhost:8443; done
-\`\`\`
+The private key and certificate are generated locally and excluded from Git. Existing certificates are never overwritten by the script. The certificate expires after 30 days and is self-signed, for local testing only.
 
-Test HTTPS redirect:
-\`\`\`bash
-curl -I http://localhost:8080
-\`\`\`
+## Verify
+
+```bash
+# Location must be https://localhost:8443/ (the published TLS port).
+curl -I http://localhost:8080/
+# Trust this lab certificate explicitly; inspect the different backend responses.
+for i in {1..6}; do curl --cacert certs/selfsigned.crt https://localhost:8443/; done
+curl --cacert certs/selfsigned.crt https://localhost:8443/health
+```
+
+`/health` verifies the proxy itself, not the health of the upstream pool. Ports bind to loopback. Change both the Compose mapping and redirect if using a different external TLS port.
+
+## Cleanup
+
+```bash
+docker compose down
+```
+
+For production, configure a real domain and trusted certificate with renewal, upstream failure checks, resource limits and monitoring. This lab is not a production deployment.
